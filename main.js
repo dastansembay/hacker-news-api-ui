@@ -1,14 +1,17 @@
 const API_URL = 'https://hacker-news.firebaseio.com/v0/'
 
-const state = {}
+const state = {
+    offset : 0,
+    fetch : 20
+}
 
 const get = async (url) => {
     let responce = await fetch(API_URL+url+'.json')
     return await responce.json();
 }
-const getItem = async (id) => { return await get('item/'+id)}
-const getItems = async (ids) => {
-    return await Promise.all(ids.map((id) => getItem(id)))
+const getItem = (id) => { return get('item/'+id)}
+const getItems = (ids) => {
+    return ids.map((id) => getItem(id))
 }
 
 function fetchTopStories() {
@@ -54,6 +57,7 @@ const insert = async (item) => {
         return null
     }
     let div = dce('div')
+    div.classList.add('item')
     let span = dce('span')
     span.innerHTML = `${item.score} points; by ${item.by}; ${getDateSincePost(item.time)};  <a href='?id=${item.id}'>${item.descendants} comments</a>`
     let header = dce('h3')
@@ -65,16 +69,22 @@ const insert = async (item) => {
         a.href = window.location.href
     }
     a.textContent = item.title
+
     header.appendChild(a)
     div.appendChild(header)
     div.appendChild(span)
+
+    if(item.text) {
+        div.appendChild(dce('br'))
+        div.innerHTML += item.text
+    }
 
     if(item.type === 'job') {
         span.innerHTML = `${getDateSincePost(item.time)}`
     }
 
     if(item.type === 'poll' && state.hasId) {
-        let parts = await (await getItems(item.parts)).sort((a,b)=> {
+        let parts = (await Promise.all(getItems(item.parts))).sort((a,b)=> {
             let scoreA = a.score
             let scoreB = b.score
             if(scoreA == scoreB) return 0
@@ -117,7 +127,7 @@ const createComment = (comment) => {
 
 const insertInner = async (comment, div) => {
     if(comment.kids !== undefined && comment.kids.length > 0) {
-        let innerComments = await getItems(comment.kids)
+        let innerComments = await Promise.all(getItems(comment.kids))
         let innerCommentDivs = await Promise.all(innerComments.map(async (c) => {
             if(c.deleted)
                return null
@@ -148,6 +158,33 @@ function getParameterByName(name, url) {
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
+const bindPageControls = () => {
+    let prev = document.getElementById('pagePrev')
+    let next = document.getElementById('pageNext')
+    const updatePrev = () => prev.disabled = state.offset == 0
+    const updateNext = () => next.disabled = state.offset+state.fetch >= state.pageTotalItems
+    prev.addEventListener('click', async () => {
+        if(state.offset == 0) {
+            return
+        }
+        state.offset -= state.fetch
+        updatePrev();
+        updateNext();
+        await loadPage();
+    })
+    
+    next.addEventListener('click', async () => {
+        if(state.offset+state.fetch >= state.pageTotalItems) {
+            return
+        }
+        state.offset += state.fetch
+        console.log(state.offset)
+        updatePrev();
+        updateNext();
+        await loadPage()
+    }, false)
+}
+
 const updateActiveLink = () => {
     let page = getParameterByName('page');
     if(page === '' || page === null) 
@@ -156,42 +193,55 @@ const updateActiveLink = () => {
     document.getElementById(page+'Link').classList.add('link-active')
 }
 
+const loadPage = async () => {
+    document.getElementById("pageControls").hidden = true;
+    document.getElementById("loader").hidden = false;
+    let contentDiv = document.getElementById('content')
+    contentDiv.innerHTML = ""
+    switch (getParameterByName('page')) {
+        case 'jobs':
+            if(!state.hasId) {
+                state.pageTotalItems = state.jobstoriesIds.length
+                let items = await Promise.all(getItems(state.jobstoriesIds.slice(state.offset, state.offset+state.fetch)));
+                let divs = await Promise.all(items.map((i) => insert(i)))
+                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
+                document.getElementById("pageControls").hidden = false;
+            }
+            document.getElementById("loader").hidden = true;
+            break;
+        default:
+            if(!state.hasId) {
+                state.pageTotalItems = state.topStoriesIds.length
+                let items = await Promise.all(getItems(state.topStoriesIds.slice(state.offset, state.offset+state.fetch)))
+                let divs = await Promise.all(items.map((i) => insert(i)))
+                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
+                document.getElementById("pageControls").hidden = false;
+            } else {
+                let item = await getItem(state.id)
+                let div = await insert(item)
+                document.getElementById('content').appendChild(div)
+                let comments = await Promise.all(getItems(item.kids))
+                
+                let divs = await Promise.all(comments.map((i) => insertComment(i)))
+                divs.filter(c => c !== null).forEach(div => document.getElementById('content').appendChild(div))
+            }
+            
+            document.getElementById("loader").hidden = true;
+            break;
+    }
+    
+}
+
+
 const main = async () => {
     state.topStoriesIds = await get('topstories')
     state.newStoriesIds = await get('newstories')
     state.bestStoriesIds = await get('beststories')
     state.jobstoriesIds = await get('jobstories')
-
     state.id = getParameterByName('id')
     state.hasId = state.id !== null && state.id !== '' && state.id.match(/\d+/)
-    let contentDiv = document.getElementById('content')
-    switch (getParameterByName('page')) {
-        case 'jobs':
-            if(!state.hasId) {
-                let items = await getItems(state.jobstoriesIds.slice(0,20));
-                let divs = await Promise.all(items.map((i) => insert(i)))
-                
-                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
-            }
-            document.getElementById("loader").style.display = "none";
-            break;
-        default:
-            if(!state.hasId) {
-                let items = await getItems(state.topStoriesIds.slice(0,20))
-                let divs = await Promise.all(items.map((i) => insert(i)))
-                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
-            } else {
-                let item = await getItem(state.id)
-                await insert(item)
-                let comments = await getItems(item.kids)
-                
-                let divs = await Promise.all(comments.map((i) => insertComment(i)))
-                divs.filter(c => c !== null).forEach(div => document.getElementById('content').appendChild(div))
-            }
-            document.getElementById("loader").style.display = "none";
-            break;
-    }
-    // document.getElementById("loader").style.display = "none";    
+    await loadPage()
 }
 updateActiveLink()
+bindPageControls()
 main()
