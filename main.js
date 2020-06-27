@@ -50,13 +50,16 @@ function getDateSincePost(postDate) {
 let dce = (tag) => document.createElement(tag)
 
 const insert = async (item) => {
+    if(item.deleted) {
+        return null
+    }
     let div = dce('div')
     let span = dce('span')
     span.innerHTML = `${item.score} points; by ${item.by}; ${getDateSincePost(item.time)};  <a href='?id=${item.id}'>${item.descendants} comments</a>`
     let header = dce('h3')
     
     let a = dce('a')
-    if(item.type === 'story') {
+    if(item.type === 'story' || item.type === 'job') {
         a.href = item.url
     } else {
         a.href = window.location.href
@@ -66,7 +69,11 @@ const insert = async (item) => {
     div.appendChild(header)
     div.appendChild(span)
 
-    if(item.type === 'poll') {
+    if(item.type === 'job') {
+        span.innerHTML = `${getDateSincePost(item.time)}`
+    }
+
+    if(item.type === 'poll' && state.hasId) {
         let parts = await (await getItems(item.parts)).sort((a,b)=> {
             let scoreA = a.score
             let scoreB = b.score
@@ -88,8 +95,6 @@ const insert = async (item) => {
         })
     }
 
-    
-    document.getElementById('content').appendChild(div)
     return div
 }
 
@@ -143,24 +148,50 @@ function getParameterByName(name, url) {
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
+const updateActiveLink = () => {
+    let page = getParameterByName('page');
+    if(page === '' || page === null) 
+        page = 'main';
+    [...document.getElementsByTagName('a')].map(a => a.classList.remove('link-active'))
+    document.getElementById(page+'Link').classList.add('link-active')
+}
+
 const main = async () => {
     state.topStoriesIds = await get('topstories')
     state.newStoriesIds = await get('newstories')
     state.bestStoriesIds = await get('beststories')
+    state.jobstoriesIds = await get('jobstories')
 
-    let id = getParameterByName('id')
-
-    
-    if(id === null || id === '' || !id.match(/\d+/)) {
-        getItems(state.topStoriesIds.slice(0,20)).then((data) =>  data.map(async(i) => await insert(i)))
-    } else {
-        let item = await getItem(id)
-        await insert(item)
-        let comments = await getItems(item.kids)
-        
-        let divs = await Promise.all(comments.map((i) => insertComment(i)))
-        divs.filter(c => c !== null).forEach(div => document.getElementById('content').appendChild(div))
+    state.id = getParameterByName('id')
+    state.hasId = state.id !== null && state.id !== '' && state.id.match(/\d+/)
+    let contentDiv = document.getElementById('content')
+    switch (getParameterByName('page')) {
+        case 'jobs':
+            if(!state.hasId) {
+                let items = await getItems(state.jobstoriesIds.slice(0,20));
+                let divs = await Promise.all(items.map((i) => insert(i)))
+                
+                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
+            }
+            document.getElementById("loader").style.display = "none";
+            break;
+        default:
+            if(!state.hasId) {
+                let items = await getItems(state.topStoriesIds.slice(0,20))
+                let divs = await Promise.all(items.map((i) => insert(i)))
+                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
+            } else {
+                let item = await getItem(state.id)
+                await insert(item)
+                let comments = await getItems(item.kids)
+                
+                let divs = await Promise.all(comments.map((i) => insertComment(i)))
+                divs.filter(c => c !== null).forEach(div => document.getElementById('content').appendChild(div))
+            }
+            document.getElementById("loader").style.display = "none";
+            break;
     }
+    // document.getElementById("loader").style.display = "none";    
 }
-
+updateActiveLink()
 main()

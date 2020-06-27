@@ -7,16 +7,18 @@
     <header class="header">
         <nav class="inner">
             <span class="logo" style="cursor: pointer;" onclick="window.location.href='/'">&lt;ClonerNews&gt; </span>
-            <a href="/" class="router-link-exact-active router-link-active">Top</a>
+            <a id="mainLink" href="/">Top</a>
             <a href="/new" class="">New</a>
             <a href="/show" class="">Show</a>
             <a href="/ask" class="">Ask</a>
-            <a href="/job" class="">Jobs</a>
+            <a id="jobsLink" href="?page=jobs" class="">Jobs</a>
         </nav>
     </header>
 
     <div id='content' class="content">
     </div>
+
+    <div id="loader"></div>
 </body>
 <script type="module" src="main.js"></script>
 
