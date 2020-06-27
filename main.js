@@ -7,7 +7,9 @@ const get = async (url) => {
     return await responce.json();
 }
 const getItem = async (id) => { return await get('item/'+id)}
-const getItems = async (ids) => await Promise.all(ids.map(id => getItem(id)))
+const getItems = async (ids) => {
+    return await Promise.all(ids.map((id) => getItem(id)))
+}
 
 function fetchTopStories() {
     const topStoriesUrl = `${hnBaseUrl}/topstories.json`
@@ -93,9 +95,6 @@ const insert = async (item) => {
 
 
 const createComment = (comment) => {
-    if(comment.deleted)
-        return null
-
     let div = dce('div')
     div.classList.add('comment')
 
@@ -114,22 +113,24 @@ const createComment = (comment) => {
 const insertInner = async (comment, div) => {
     if(comment.kids !== undefined && comment.kids.length > 0) {
         let innerComments = await getItems(comment.kids)
-        innerComments.map(async (c) => {
+        let innerCommentDivs = await Promise.all(innerComments.map(async (c) => {
+            if(c.deleted)
+               return null
             let innerCommentDiv = createComment(c)
             await insertInner(c, innerCommentDiv)
-            div.appendChild(innerCommentDiv)
-        })
+            return innerCommentDiv
+        }))
+        innerCommentDivs.filter(c => c !== null).forEach(c => div.appendChild(c))
     }
 }
 
 
 const insertComment = async (comment) => {
+    if(comment.deleted)
+        return null
     let commentDiv = createComment(comment)
-    if(commentDiv === null)
-        return
     await insertInner(comment, commentDiv)
-
-    document.getElementById('content').appendChild(commentDiv)
+    return commentDiv
 }
 
 function getParameterByName(name, url) {
@@ -148,16 +149,18 @@ const main = async () => {
     state.bestStoriesIds = await get('beststories')
 
     let id = getParameterByName('id')
+
+    
     if(id === null || id === '' || !id.match(/\d+/)) {
         getItems(state.topStoriesIds.slice(0,20)).then((data) =>  data.map(async(i) => await insert(i)))
     } else {
         let item = await getItem(id)
         await insert(item)
         let comments = await getItems(item.kids)
-        comments.map(async (i) => await insertComment(i))
+        
+        let divs = await Promise.all(comments.map((i) => insertComment(i)))
+        divs.filter(c => c !== null).forEach(div => document.getElementById('content').appendChild(div))
     }
-
-    
 }
 
 main()
