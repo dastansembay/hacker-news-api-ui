@@ -2,7 +2,6 @@ const API_URL = 'https://hacker-news.firebaseio.com/v0/'
 
 const state = {}
 
-
 const get = async (url) => {
     let responce = await fetch(API_URL+url+'.json')
     return await responce.json();
@@ -48,18 +47,48 @@ function getDateSincePost(postDate) {
 
 let dce = (tag) => document.createElement(tag)
 
-const insert = (item) => {
+const insert = async (item) => {
     let div = dce('div')
     let span = dce('span')
     span.innerHTML = `${item.score} points; by ${item.by}; ${getDateSincePost(item.time)};  <a href='?id=${item.id}'>${item.descendants} comments</a>`
     let header = dce('h3')
+    
     let a = dce('a')
-    a.href = item.url
+    if(item.type === 'story') {
+        a.href = item.url
+    } else {
+        a.href = window.location.href
+    }
     a.textContent = item.title
     header.appendChild(a)
     div.appendChild(header)
     div.appendChild(span)
+
+    if(item.type === 'poll') {
+        let parts = await (await getItems(item.parts)).sort((a,b)=> {
+            let scoreA = a.score
+            let scoreB = b.score
+            if(scoreA == scoreB) return 0
+            return scoreA > scoreB ? -1 : 1
+        })
+        parts.map((p) => {
+            let pdiv = dce('div')
+            pdiv.classList.add('poll')
+            let pheader = dce('span')
+            pheader.classList.add('poll-option')
+            pheader.textContent = p.text
+            let pspan = dce('span')
+            pspan.style.marginLeft = '5px'
+            pspan.innerHTML = `<small style='color:gray'>  ${p.score} points</small>`
+            pdiv.appendChild(pheader)
+            pdiv.appendChild(pspan)
+            div.appendChild(pdiv)
+        })
+    }
+
+    
     document.getElementById('content').appendChild(div)
+    return div
 }
 
 
@@ -86,8 +115,8 @@ const insertInner = async (comment, div) => {
     if(comment.kids !== undefined && comment.kids.length > 0) {
         let innerComments = await getItems(comment.kids)
         innerComments.map(async (c) => {
-            let innerCommentDiv = await createComment(c)
-            insertInner(c, innerCommentDiv)
+            let innerCommentDiv = createComment(c)
+            await insertInner(c, innerCommentDiv)
             div.appendChild(innerCommentDiv)
         })
     }
@@ -118,26 +147,16 @@ const main = async () => {
     state.newStoriesIds = await get('newstories')
     state.bestStoriesIds = await get('beststories')
 
-    switch (window.location.pathname) {
-        case '/':
-            let id = getParameterByName('id')
-            if(id === null || id === '' || !id.match(/\d+/)) {
-                getItems(state.topStoriesIds.slice(0,20)).then((data) => data.map(insert))
-            } else {
-                let item = await getItem(id)
-                insert(item)
-                let kids = await getItems(item.kids)
-                kids.map(async (i) => await insertComment(i))
-            }
-
-            break;
-        case '/item.html':
-                
-            id = parseInt(id)
-            break;
-        default:
-            break;
+    let id = getParameterByName('id')
+    if(id === null || id === '' || !id.match(/\d+/)) {
+        getItems(state.topStoriesIds.slice(0,20)).then((data) =>  data.map(async(i) => await insert(i)))
+    } else {
+        let item = await getItem(id)
+        await insert(item)
+        let comments = await getItems(item.kids)
+        comments.map(async (i) => await insertComment(i))
     }
+
     
 }
 

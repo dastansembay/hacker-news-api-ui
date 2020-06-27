@@ -66,6 +66,20 @@ h3 {
     margin-bottom: 3px;
 }
 
+
+.poll {
+    margin: 5 5 5 10px;
+}
+
+.poll-option {
+    margin: 3px auto;
+    
+}
+
+.poll-option:before{
+    content: " • ";
+}
+
 .comment {
     padding: 0 10px;
     margin: 10 5 10 5px;
