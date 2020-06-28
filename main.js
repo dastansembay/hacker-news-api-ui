@@ -4,6 +4,7 @@ const state = {
     offset : 0,
     fetch : 20,
     checkUpdates : true,
+    abortController : new AbortController(),
     top: {
 
     },
@@ -25,12 +26,15 @@ const state = {
 }
 
 const displayError = (message) => {
+    if(state.error)
+        return
+    state.error = true
     alert('Fetching error, check your connection. (' + message+')');
     location.reload();
 }
 
 const get = async (url) => {
-    let response = await (fetch(API_URL+url+'.json')
+    let response = await (fetch(API_URL+url+'.json', {signal: state.abortController.signal})
         .catch(displayError))
     if(!response.ok) {
         displayError(response.statusText)
@@ -241,6 +245,8 @@ const bindPageControls = () => {
         await loadPage()
         updatePageControlsState()
     }, false)
+
+    window.onunload = () => state.abortController.abort()
 }
 
 const getCurrentPage = () => {

@@ -2,13 +2,10 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
     font-size: 15px;
     background-color: #f2f3f5;
+    color: #34495e;
     margin: 0;
     padding-top: 55px;
     overflow-y: scroll
-}
-
-body {
-    color: #34495e
 }
 
 .content {
@@ -148,9 +145,10 @@ hr {
   /* Snackbar */
 
   #snackbar {
+    bottom: 15px;
+    right: 50px;
     visibility: hidden;
     min-width: 250px;
-    margin-left: -125px;
     background-color: #34495e;
     color: #fff;
     text-align: center;
@@ -158,8 +156,6 @@ hr {
     padding: 16px;
     position: fixed;
     z-index: 1;
-    left: 50%;
-    bottom: 30px;
     font-size: 17px;
   }
   
