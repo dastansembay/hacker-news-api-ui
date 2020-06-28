@@ -196,16 +196,14 @@ const createLiveDataTimeout = () => {
 
 const setLiveDataUpdater = () => {
     let snack = document.getElementById("snackbar")
-    snack.addEventListener("animationend", () => {
-        snack.className = snack.className.replace("show", "")
-        createLiveDataTimeout()
-    }, false);
     let link = document.getElementById('updatePageLink')
     link.addEventListener('click', async (e) => {
+        snack.className = snack.className.replace("show", "")
         state.offset = 0
         updatePageControlsState();
         state.topStoriesIds = await get('topstories')
         await loadPage();
+        createLiveDataTimeout()
         e.preventDefault();
     });
 
@@ -225,7 +223,9 @@ const setLiveDataUpdater = () => {
                 }, 5000)
             break;
         default:
-            createLiveDataTimeout();
+            if(!state.hasId) {
+                createLiveDataTimeout();
+            }
             break;
     }
 }
@@ -317,8 +317,8 @@ const main = async () => {
     state.id = getParameterByName('id')
     state.hasId = state.id !== null && state.id !== '' && state.id.match(/\d+/)
     await loadPage()
+    setLiveDataUpdater()
 }
 updateActiveLink()
 bindPageControls()
 main()
-setLiveDataUpdater()

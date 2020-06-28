@@ -172,7 +172,7 @@ hr {
   #snackbar.show {
     visibility: visible;
     animation-name: fadein;
-    animation-duration: 4s;
+    animation-duration: 0.5s;
   }
   
   @-webkit-keyframes fadein {
@@ -183,10 +183,12 @@ hr {
   }
   
   @keyframes fadein {
-    0% {bottom: 0; opacity: 0;} 
-    20% {bottom: 30px; opacity: 1;}
-    90% {bottom: 30px; opacity: 1;}
-    100% {bottom: 0; opacity: 0;}
+    /* 0% {bottom: 0; opacity: 0;} 
+    25% {bottom: 10px; opacity: 0.50;}
+    50% {bottom: 20px; opacity: 0.70;}
+    100% {bottom: 30px; opacity: 1;} */
+    from {bottom: 0; opacity: 0; }
+    to   {bottom: 30px; opacity: 1; }
   }
 
   /* Snackbar */
