@@ -3,7 +3,25 @@ const API_URL = 'https://hacker-news.firebaseio.com/v0/'
 const state = {
     offset : 0,
     fetch : 20,
-    checkUpdates : true
+    checkUpdates : true,
+    top: {
+
+    },
+    new: {
+
+    },
+    best: {
+
+    },
+    ask: {
+
+    },
+    show: {
+
+    },
+    job: {
+
+    },
 }
 
 const get = async (url) => {
@@ -12,27 +30,10 @@ const get = async (url) => {
 }
 const getItem = (id) => { return get('item/'+id)}
 const getItems = (ids) => {
+    if(ids === undefined)
+        return [];
     return ids.map((id) => getItem(id))
 }
-
-function fetchTopStories() {
-    const topStoriesUrl = `${hnBaseUrl}/topstories.json`
-    return fetch(topStoriesUrl).then(response => response.json())
-      .then((data) => fetchStories(data))
-  }
-
-function fetchStories(data) {
-    const topStories = data.slice(0, 29)
-    const storyIds = topStories.map((storyId) => {
-      const storyUrl = `${hnBaseUrl}/item/${storyId}.json`
-      return fetch(storyUrl).then((response) => response.json())
-        .then((story) => story)
-    })
-    return Promise.all(storyIds).then((stories) => {
-      state.stories = stories
-      renderStories(stories)
-    })
-  }
 
 function getDateSincePost(postDate) {
     var timeSince = (Date.now() / 1000) - postDate;
@@ -53,10 +54,7 @@ function getDateSincePost(postDate) {
 
 let dce = (tag) => document.createElement(tag)
 
-const insert = async (item) => {
-    if(item.deleted) {
-        return null
-    }
+const createItemDiv = async (item) => {
     let div = dce('div')
     div.classList.add('item')
     let span = dce('span')
@@ -65,7 +63,7 @@ const insert = async (item) => {
     
     let a = dce('a')
     if(item.type === 'story' || item.type === 'job') {
-        a.href = item.url
+        a.href = item.url ? item.url : `?id=${item.id}`
     } else {
         a.href = window.location.href
     }
@@ -110,7 +108,7 @@ const insert = async (item) => {
 }
 
 
-const createComment = (comment) => {
+const generateCommentDiv = (comment) => {
     let div = dce('div')
     div.classList.add('comment')
 
@@ -126,26 +124,21 @@ const createComment = (comment) => {
     return div
 }
 
-const insertInner = async (comment, div) => {
+const insertInnerComments = async (comment, div) => {
     if(comment.kids !== undefined && comment.kids.length > 0) {
         let innerComments = await Promise.all(getItems(comment.kids))
-        let innerCommentDivs = await Promise.all(innerComments.map(async (c) => {
-            if(c.deleted)
-               return null
-            let innerCommentDiv = createComment(c)
-            await insertInner(c, innerCommentDiv)
+        let innerCommentDivs = await Promise.all(innerComments.filter(c => !c.deleted).map(async (c) => {
+            let innerCommentDiv = generateCommentDiv(c)
+            await insertInnerComments(c, innerCommentDiv)
             return innerCommentDiv
         }))
-        innerCommentDivs.filter(c => c !== null).forEach(c => div.appendChild(c))
+        innerCommentDivs.map(c => div.appendChild(c))
     }
 }
 
-
-const insertComment = async (comment) => {
-    if(comment.deleted)
-        return null
-    let commentDiv = createComment(comment)
-    await insertInner(comment, commentDiv)
+const createCommentDiv = async (comment) => {
+    let commentDiv = generateCommentDiv(comment)
+    await insertInnerComments(comment, commentDiv)
     return commentDiv
 }
 
@@ -177,19 +170,23 @@ const showSnackbar = () => {
   }
 
 const createLiveDataTimeout = () => {
+    if(state.hasId) {
+        return
+    }
+    let page = getCurrentPage()
     setTimeout(async () => {
         if(!state.checkUpdates) {
             createLiveDataTimeout();
             return;
         }
-        console.log('checking updates')
-        let ids = await get('topstories')
-        if(!sameArray(ids, state.topStoriesIds)) {
-            console.log('top updated')
+        console.log(page+': checking updates')
+        let ids = await get(page+'stories')
+        if(!sameArray(ids, state[page].ids)) {
+            console.log(page+': updates available')
             showSnackbar()
         } else {
             createLiveDataTimeout()
-            console.log('no updates detected')
+            console.log(page+': no updates detected')
         }
     }, 5000)
 }
@@ -199,35 +196,12 @@ const setLiveDataUpdater = () => {
     let link = document.getElementById('updatePageLink')
     link.addEventListener('click', async (e) => {
         snack.className = snack.className.replace("show", "")
-        state.offset = 0
-        updatePageControlsState();
-        state.topStoriesIds = await get('topstories')
+        await updatePageProps()
         await loadPage();
         createLiveDataTimeout()
         e.preventDefault();
     });
-
-    switch (getParameterByName('page')) {
-        case 'jobs':
-                setInterval(async () => {
-                    if(!state.checkUpdates)
-                        return;
-                    console.log('checking updates')
-                    let ids = await get('jobstories')
-                    if(!sameArray(ids, state.jobstoriesIds)) {
-                        console.log('jobs updated')
-                        showSnackbar()
-                    } else {
-                        console.log('no updates detected')
-                    }
-                }, 5000)
-            break;
-        default:
-            if(!state.hasId) {
-                createLiveDataTimeout();
-            }
-            break;
-    }
+    createLiveDataTimeout();
 }
 
 const updatePageControlsState = () => {
@@ -247,7 +221,7 @@ const bindPageControls = () => {
         state.offset -= state.fetch
         await loadPage();
         updatePageControlsState();
-    },false)
+    }, false)
     
     next.addEventListener('click', async () => {
         if(state.offset+state.fetch >= state.pageTotalItems) {
@@ -259,66 +233,67 @@ const bindPageControls = () => {
     }, false)
 }
 
+const getCurrentPage = () => {
+    let p = getParameterByName('page')
+    if(p === '/' || p === null) {
+        return 'top'
+    }
+    return p
+}
+
 const updateActiveLink = () => {
-    let page = getParameterByName('page');
-    if(page === '' || page === null) 
-        page = 'main';
-    [...document.getElementsByTagName('a')].map(a => a.classList.remove('link-active'))
-    document.getElementById(page+'Link').classList.add('link-active')
+    let page = getCurrentPage()
+    let links = [...document.getElementsByTagName('a')].filter(l => l.href.includes('page'))
+    links.map(a => a.classList.remove('link-active'))
+    links.find(l => l.href.includes(`?page=${page}`)).classList.add('link-active')
 }
 
 const loadPage = async () => {
     state.checkUpdates = false
     document.getElementById("pageControls").hidden = true;
     document.getElementById("loader").hidden = false;
+
+    let page = getCurrentPage()
     let contentDiv = document.getElementById('content')
     contentDiv.innerHTML = ""
-    switch (getParameterByName('page')) {
-        case 'jobs':
-            if(!state.hasId) {
-                state.pageTotalItems = state.jobstoriesIds.length
-                let items = await Promise.all(getItems(state.jobstoriesIds.slice(state.offset, state.offset+state.fetch)));
-                let divs = await Promise.all(items.map((i) => insert(i)))
-                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
-                document.getElementById("pageControls").hidden = false;
-            }
-            document.getElementById("loader").hidden = true;
-            break;
-        default:
-            if(!state.hasId) {
-                state.pageTotalItems = state.topStoriesIds.length
-                let items = await Promise.all(getItems(state.topStoriesIds.slice(state.offset, state.offset+state.fetch)))
-                let divs = await Promise.all(items.map((i) => insert(i)))
-                divs.filter(div => div !== null).map(div => contentDiv.appendChild(div))
-                document.getElementById("pageControls").hidden = false;
-            } else {
-                let item = await getItem(state.id)
-                let div = await insert(item)
-                document.getElementById('content').appendChild(div)
-                let comments = await Promise.all(getItems(item.kids))
-                
-                let divs = await Promise.all(comments.map((i) => insertComment(i)))
-                divs.filter(c => c !== null).forEach(div => document.getElementById('content').appendChild(div))
-            }
-            
-            document.getElementById("loader").hidden = true;
-            break;
+    if(state.hasId) {
+        let item = await getItem(state.id)
+        let div = await createItemDiv(item)
+        document.title = item.title
+        document.getElementById('content').appendChild(div)
+        let comments = await Promise.all(getItems(item.kids))
+        
+        let divs = await Promise.all(comments.filter(c => !c.deleted && !c.dead).map((c) => createCommentDiv(c)))
+        divs.map(div => contentDiv.appendChild(div))
+    } else {
+        document.title = 'HN '+page
+        let items = await Promise.all(getItems(state[page].ids.slice(state.offset, state.offset + state.fetch)))
+        let divs = await Promise.all(items.filter(i => !i.deleted && !i.dead).map((i) => createItemDiv(i)))
+        divs.map(div => contentDiv.appendChild(div))
+        document.getElementById("pageControls").hidden = false;
     }
-    state.checkUpdates = true;
+
+    document.getElementById("loader").hidden = true;
+    state.checkUpdates = true
 }
 
-
-const main = async () => {
-    state.topStoriesIds = await get('topstories')
-    state.jobstoriesIds = await get('jobstories')
-    state.newStoriesIds = await get('newstories')
-    state.bestStoriesIds = await get('beststories')
-    
+const updatePageProps = async () => {
+    let page = getCurrentPage()
+    state[page].ids = await get(page+'stories')
+    state.pageTotalItems = state[page].ids.length
     state.id = getParameterByName('id')
     state.hasId = state.id !== null && state.id !== '' && state.id.match(/\d+/)
+    state.offset = 0
+    state.fetch = 20
+    updatePageControlsState()
+}
+
+const main = async () => {
+    await updatePageProps()
     await loadPage()
     setLiveDataUpdater()
 }
+
 updateActiveLink()
 bindPageControls()
 main()
