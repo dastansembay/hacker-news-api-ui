@@ -24,9 +24,18 @@ const state = {
     },
 }
 
+const displayError = (message) => {
+    alert('Fetching error, check your connection. (' + message+')');
+    location.reload();
+}
+
 const get = async (url) => {
-    let responce = await fetch(API_URL+url+'.json')
-    return await responce.json();
+    let response = await fetch(API_URL+url+'.json')
+        .catch(error => displayError(error))
+    if(!response.ok) {
+        displayError(response.statusText)
+    }
+    return await response.json();
 }
 const getItem = (id) => { return get('item/'+id)}
 const getItems = (ids) => {
