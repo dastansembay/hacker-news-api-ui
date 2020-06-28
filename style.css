@@ -143,3 +143,51 @@ hr {
   }
 
   /* loader */
+
+
+  /* Snackbar */
+
+  #snackbar {
+    visibility: hidden;
+    min-width: 250px;
+    margin-left: -125px;
+    background-color: #34495e;
+    color: #fff;
+    text-align: center;
+    border-radius: 2px;
+    padding: 16px;
+    position: fixed;
+    z-index: 1;
+    left: 50%;
+    bottom: 30px;
+    font-size: 17px;
+  }
+  
+  #snackbar a {
+    color: white;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+
+  #snackbar.show {
+    visibility: visible;
+    animation-name: fadein;
+    animation-duration: 4s;
+  }
+  
+  @-webkit-keyframes fadein {
+    0% {bottom: 0; opacity: 0;} 
+    20% {bottom: 30px; opacity: 1;}
+    90% {bottom: 30px; opacity: 1;}
+    100% {bottom: 0; opacity: 0;} 
+  }
+  
+  @keyframes fadein {
+    0% {bottom: 0; opacity: 0;} 
+    20% {bottom: 30px; opacity: 1;}
+    90% {bottom: 30px; opacity: 1;}
+    100% {bottom: 0; opacity: 0;}
+  }
+
+  /* Snackbar */
+

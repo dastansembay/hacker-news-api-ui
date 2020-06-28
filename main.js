@@ -2,7 +2,8 @@ const API_URL = 'https://hacker-news.firebaseio.com/v0/'
 
 const state = {
     offset : 0,
-    fetch : 20
+    fetch : 20,
+    checkUpdates : true
 }
 
 const get = async (url) => {
@@ -74,7 +75,7 @@ const insert = async (item) => {
     div.appendChild(header)
     div.appendChild(span)
 
-    if(item.text) {
+    if(item.text && state.hasId) {
         div.appendChild(dce('br'))
         div.innerHTML += item.text
     }
@@ -158,30 +159,103 @@ function getParameterByName(name, url) {
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
+const sameArray = (arr1, arr2) => {
+    if(arr1.length !== arr2.length) {
+        return false          
+    }
+
+    for(let i=0; i < arr1.length; i++)
+        if(arr1[i] !== arr2[i]) 
+            return false;
+
+    return true;
+}
+
+const showSnackbar = () => {
+    var snack = document.getElementById("snackbar");
+    snack.className = "show";
+  }
+
+const createLiveDataTimeout = () => {
+    setTimeout(async () => {
+        if(!state.checkUpdates) {
+            createLiveDataTimeout();
+            return;
+        }
+        console.log('checking updates')
+        let ids = await get('topstories')
+        if(!sameArray(ids, state.topStoriesIds)) {
+            console.log('top updated')
+            showSnackbar()
+        } else {
+            createLiveDataTimeout()
+            console.log('no updates detected')
+        }
+    }, 5000)
+}
+
+const setLiveDataUpdater = () => {
+    let snack = document.getElementById("snackbar")
+    snack.addEventListener("animationend", () => {
+        snack.className = snack.className.replace("show", "")
+        createLiveDataTimeout()
+    }, false);
+    let link = document.getElementById('updatePageLink')
+    link.addEventListener('click', async (e) => {
+        state.offset = 0
+        updatePageControlsState();
+        state.topStoriesIds = await get('topstories')
+        await loadPage();
+        e.preventDefault();
+    });
+
+    switch (getParameterByName('page')) {
+        case 'jobs':
+                setInterval(async () => {
+                    if(!state.checkUpdates)
+                        return;
+                    console.log('checking updates')
+                    let ids = await get('jobstories')
+                    if(!sameArray(ids, state.jobstoriesIds)) {
+                        console.log('jobs updated')
+                        showSnackbar()
+                    } else {
+                        console.log('no updates detected')
+                    }
+                }, 5000)
+            break;
+        default:
+            createLiveDataTimeout();
+            break;
+    }
+}
+
+const updatePageControlsState = () => {
+    let prev = document.getElementById('pagePrev')
+    let next = document.getElementById('pageNext')
+    prev.disabled = state.offset == 0
+    next.disabled = state.offset+state.fetch >= state.pageTotalItems
+}
+
 const bindPageControls = () => {
     let prev = document.getElementById('pagePrev')
     let next = document.getElementById('pageNext')
-    const updatePrev = () => prev.disabled = state.offset == 0
-    const updateNext = () => next.disabled = state.offset+state.fetch >= state.pageTotalItems
     prev.addEventListener('click', async () => {
         if(state.offset == 0) {
             return
         }
         state.offset -= state.fetch
-        updatePrev();
-        updateNext();
         await loadPage();
-    })
+        updatePageControlsState();
+    },false)
     
     next.addEventListener('click', async () => {
         if(state.offset+state.fetch >= state.pageTotalItems) {
             return
         }
         state.offset += state.fetch
-        console.log(state.offset)
-        updatePrev();
-        updateNext();
         await loadPage()
+        updatePageControlsState()
     }, false)
 }
 
@@ -194,6 +268,7 @@ const updateActiveLink = () => {
 }
 
 const loadPage = async () => {
+    state.checkUpdates = false
     document.getElementById("pageControls").hidden = true;
     document.getElementById("loader").hidden = false;
     let contentDiv = document.getElementById('content')
@@ -229,15 +304,16 @@ const loadPage = async () => {
             document.getElementById("loader").hidden = true;
             break;
     }
-    
+    state.checkUpdates = true;
 }
 
 
 const main = async () => {
     state.topStoriesIds = await get('topstories')
+    state.jobstoriesIds = await get('jobstories')
     state.newStoriesIds = await get('newstories')
     state.bestStoriesIds = await get('beststories')
-    state.jobstoriesIds = await get('jobstories')
+    
     state.id = getParameterByName('id')
     state.hasId = state.id !== null && state.id !== '' && state.id.match(/\d+/)
     await loadPage()
@@ -245,3 +321,4 @@ const main = async () => {
 updateActiveLink()
 bindPageControls()
 main()
+setLiveDataUpdater()
