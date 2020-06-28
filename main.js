@@ -30,8 +30,8 @@ const displayError = (message) => {
 }
 
 const get = async (url) => {
-    let response = await fetch(API_URL+url+'.json')
-        .catch(error => displayError(error))
+    let response = await (fetch(API_URL+url+'.json')
+        .catch(displayError))
     if(!response.ok) {
         displayError(response.statusText)
     }
@@ -204,11 +204,12 @@ const setLiveDataUpdater = () => {
     let snack = document.getElementById("snackbar")
     let link = document.getElementById('updatePageLink')
     link.addEventListener('click', async (e) => {
+        e.preventDefault();
         snack.className = snack.className.replace("show", "")
         await updatePageProps()
         await loadPage();
         createLiveDataTimeout()
-        e.preventDefault();
+        return false;
     });
     createLiveDataTimeout();
 }
