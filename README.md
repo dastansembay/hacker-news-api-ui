@@ -1,2 +1,2 @@
-# div-01-piscine-js-clonernews
+# Pure JS UI for Hacker News API
 
